@@ -222,14 +222,21 @@ async function accessToken() {
   auth.access = j.access_token; auth.exp = Date.now() + j.expires_in * 1000; LS.set('wt_auth', auth);
   return auth.access;
 }
-$('#dbxAuth').onclick = async () => {
-  cfg.appKey = $('#appKey').value.trim(); saveCfg();
-  if (!cfg.appKey) return toast('App Key fehlt');
-  const v = b64url(crypto.getRandomValues(new Uint8Array(32)));
+// Login-Link wird VORAB berechnet: iOS blockiert Pop-ups, die nach einem await geöffnet werden
+async function prepAuthLink() {
+  const key = $('#appKey').value.trim(), a = $('#dbxAuth');
+  if (!key) { a.removeAttribute('href'); return; }
+  let v = localStorage.getItem('wt_pkce');
+  if (!v) { v = b64url(crypto.getRandomValues(new Uint8Array(32))); localStorage.setItem('wt_pkce', v); }
   const c = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  localStorage.setItem('wt_pkce', v);
-  window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(cfg.appKey)}&response_type=code&code_challenge=${c}&code_challenge_method=S256&token_access_type=offline`, '_blank');
+  a.href = `https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(key)}&response_type=code&code_challenge=${c}&code_challenge_method=S256&token_access_type=offline`;
+}
+$('#appKey').oninput = prepAuthLink;
+$('#dbxAuth').onclick = e => {
+  cfg.appKey = $('#appKey').value.trim(); saveCfg();
+  if (!cfg.appKey) { e.preventDefault(); toast('App Key fehlt'); }
 };
+prepAuthLink();
 $('#dbxConnect').onclick = async () => {
   try {
     const j = await dbxTokenReq({ grant_type: 'authorization_code', code: $('#dbxCode').value.trim(), code_verifier: localStorage.getItem('wt_pkce') });
@@ -238,7 +245,7 @@ $('#dbxConnect').onclick = async () => {
     dbxUI(); await sync(); toast('Dropbox verbunden');
   } catch (e) { toast(e.message); }
 };
-$('#dbxOut').onclick = () => { if (confirm('Dropbox trennen? Lokale Daten bleiben.')) { auth = null; localStorage.removeItem('wt_auth'); dbxUI(); } };
+$('#dbxOut').onclick = () => { if (confirm('Dropbox trennen? Lokale Daten bleiben.')) { auth = null; localStorage.removeItem('wt_auth'); dbxUI(); prepAuthLink(); } };
 $('#dbxSync').onclick = () => sync(true);
 function dbxUI() {
   $('#dbxOff').style.display = auth ? 'none' : ''; $('#dbxOn').style.display = auth ? '' : 'none';
