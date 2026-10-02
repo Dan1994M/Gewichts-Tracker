@@ -97,7 +97,16 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:6px 4px;t
   <div class="card">
     <b>Backup</b>
     <button class="btn sec" id="exp">Export CSV</button>
-    <label>Import (CSV: Datum;Gewicht oder JSON)</label><input id="imp" type="file" accept=".csv,.txt,.json">
+    <label>Import Datei (CSV / TXT / JSON)</label><input id="imp" type="file" accept=".csv,.txt,.json">
+  </div>
+  <div class="card">
+    <b>Import aus Text (z. B. Notizen-App)</b>
+    <p class="hint">Notiz komplett kopieren und einfügen. Erkannt werden z. B. „22.04.24 74,5kg“, Tabellenzeilen „22.04.2024 | 75,0kg“, „2024-04-22;74.5“.</p>
+    <textarea id="txtIn" rows="8" style="width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font:14px ui-monospace,monospace"></textarea>
+    <button class="btn sec" id="txtCheck">Prüfen</button>
+    <div id="txtPrev" class="hint" style="margin-top:8px"></div>
+    <label id="txtOwL" style="display:none"><input type="checkbox" id="txtOw" style="width:auto"> vorhandene Einträge überschreiben</label>
+    <button class="btn" id="txtGo" style="display:none">Importieren</button>
   </div>
 </section>
 

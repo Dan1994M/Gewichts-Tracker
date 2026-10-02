@@ -160,12 +160,52 @@ $('#imp').onchange = async e => {
   try {
     const j = JSON.parse(txt); for (const [d, v] of Object.entries(j.entries || j)) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && v?.w) { entries[d] = { w: v.w, t: Date.now() }; n++; }
   } catch {
-    for (const line of txt.split(/\r?\n/)) {
-      const m = line.match(/^(\d{4}-\d{2}-\d{2})[;,\t]\s*"?(\d+[.,]?\d*)/);
-      if (m) { entries[m[1]] = { w: num(m[2]), t: Date.now() }; n++; }
-    }
+    const p = parseText(txt); n = applyImport(p.rows, true);
   }
   saveEntries(); render(); scheduleSync(); toast(`${n} Einträge importiert`); e.target.value = '';
+};
+
+// ---------- Text-Import (gemischte Formate) ----------
+// Datum: TT.MM.JJ, TT.MM.JJJJ, T.M.JJ, TT/MM/JJ, JJJJ-MM-TT; Gewicht: erste Zahl 30–300 nach dem Datum, optional "kg"
+function parseText(txt) {
+  const rows = new Map(), bad = [];
+  for (const raw of txt.split(/\r?\n/)) {
+    const line = raw.trim(); if (!line || /^[-|:\s]+$/.test(line)) continue;   // leer / Markdown-Trennzeile
+    let d = null, rest = '', m;
+    if ((m = line.match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) { d = [+m[1], +m[2], +m[3]]; }
+    else if ((m = line.match(/(\d{1,2})[./](\d{1,2})[./](\d{4}|\d{2})(?!\d)/))) { const y = +m[3]; d = [y < 100 ? 2000 + y : y, +m[2], +m[1]]; }
+    if (!d) { if (/\d/.test(line)) bad.push(line); continue; }
+    rest = line.slice(m.index + m[0].length);
+    const [y, mo, da] = d, dt = new Date(Date.UTC(y, mo - 1, da));
+    if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== da || y < 1990 || dt > Date.now() + 864e5) { bad.push(line); continue; }
+    const wm = [...rest.matchAll(/(\d{2,3}(?:[.,]\d{1,2})?)\s*(kg)?/gi)].map(x => num(x[1])).find(w => w >= 30 && w <= 300);
+    if (wm == null) { bad.push(line); continue; }
+    rows.set(dt.toISOString().slice(0, 10), Math.round(wm * 10) / 10);   // Duplikat am selben Tag: letzter gewinnt
+  }
+  return { rows: [...rows].sort(), bad };
+}
+function applyImport(rows, overwrite) {
+  let n = 0;
+  for (const [d, w] of rows) if (overwrite || !entries[d] || entries[d].del) { entries[d] = { w, t: Date.now() }; n++; }
+  return n;
+}
+let txtParsed = null;
+$('#txtCheck').onclick = () => {
+  txtParsed = parseText($('#txtIn').value);
+  const { rows, bad } = txtParsed, ex = rows.filter(([d]) => entries[d] && !entries[d].del);
+  const diff = ex.filter(([d, w]) => entries[d].w !== w);
+  $('#txtPrev').innerHTML = rows.length
+    ? `<b>${rows.length}</b> Einträge erkannt (${fmtD(rows[0][0])} – ${fmtD(rows[rows.length - 1][0])}).<br>` +
+      `Bereits vorhanden: ${ex.length}${diff.length ? `, davon <b>${diff.length} mit anderem Wert</b> (z. B. ${diff.slice(0, 3).map(([d, w]) => `${fmtD(d)}: ${f1(entries[d].w)} → ${f1(w)}`).join('; ')})` : ''}.<br>` +
+      (bad.length ? `<b>${bad.length} Zeilen nicht erkannt:</b><br>${bad.slice(0, 10).map(l => '• ' + l.replace(/</g, '&lt;')).join('<br>')}${bad.length > 10 ? '<br>…' : ''}` : 'Alle Zeilen mit Ziffern erkannt.')
+    : 'Keine Einträge erkannt.' + (bad.length ? '<br>' + bad.slice(0, 5).map(l => '• ' + l.replace(/</g, '&lt;')).join('<br>') : '');
+  $('#txtGo').style.display = $('#txtOwL').style.display = rows.length ? '' : 'none';
+};
+$('#txtGo').onclick = () => {
+  if (!txtParsed) return;
+  const n = applyImport(txtParsed.rows, $('#txtOw').checked);
+  saveEntries(); render(); scheduleSync(); toast(`${n} Einträge importiert`);
+  $('#txtIn').value = ''; $('#txtPrev').innerHTML = ''; txtParsed = null; $('#txtGo').style.display = $('#txtOwL').style.display = 'none';
 };
 
 // ---------- Dropbox (PKCE, ohne Redirect -> Code einfügen; robust in iOS-PWA) ----------

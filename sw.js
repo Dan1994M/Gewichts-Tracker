@@ -1,5 +1,5 @@
 // Version bei jedem Deploy erhöhen
-const V = 'wt-v1';
+const V = 'wt-v2';
 const SHELL = ['./', './index.html', './app.js', './manifest.json', './icon-192.png', './icon-512.png',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'];
 
