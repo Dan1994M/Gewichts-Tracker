@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gewicht</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--fg:#0f172a;--mut:#64748b;--acc:#2563eb;--ok:#16a34a;--bad:#dc2626;--bd:#e2e8f0}
+@media(prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--fg:#e2e8f0;--mut:#94a3b8;--acc:#60a5fa;--ok:#4ade80;--bad:#f87171;--bd:#334155}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 -apple-system,system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:env(safe-area-inset-top) 16px calc(80px + env(safe-area-inset-bottom))}
+h1{font-size:20px;margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center}
+#sync{font-size:12px;color:var(--mut);font-weight:400}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:12px 0}
+.tab{display:none}.tab.on{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;padding:14px 0;color:var(--mut);font-size:14px}
+nav button.on{color:var(--acc);font-weight:600}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 4px}
+input{width:100%;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font-size:17px}
+#w{font-size:32px;text-align:center;font-weight:600}
+.btn{width:100%;padding:13px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-size:16px;font-weight:600;margin-top:10px}
+.btn.sec{background:var(--bd);color:var(--fg)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.list div{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}
+.list div:last-child{border:0}
+.list small{color:var(--mut)}
+.x{background:none;border:0;color:var(--bad);font-size:18px;padding:0 4px}
+.kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi div{background:var(--bg);border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:20px}.kpi span{font-size:12px;color:var(--mut)}
+.seg{display:flex;gap:6px;margin-bottom:8px}.seg button{flex:1;padding:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);border-radius:8px}
+.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:6px 4px;text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+.pos{color:var(--bad)}.neg{color:var(--ok)}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none}
+#toast.on{opacity:.95}
+.hint{font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<h1>Gewicht <span id="sync"></span></h1>
+
+<section id="t-in" class="tab on">
+  <div class="card">
+    <label>Datum</label><input id="d" type="date">
+    <label>Gewicht (kg)</label><input id="w" type="number" inputmode="decimal" step="0.1" placeholder="0,0">
+    <button class="btn" id="saveBtn">Speichern</button>
+    <p class="hint">Gleiche Bedingungen: morgens, nüchtern, nach Toilette.</p>
+  </div>
+  <div class="card"><div class="kpi" id="quick"></div></div>
+  <div class="card list" id="recent"></div>
+</section>
+
+<section id="t-ch" class="tab">
+  <div class="card">
+    <div class="seg" id="range">
+      <button data-r="30" class="on">30T</button><button data-r="90">90T</button><button data-r="365">1J</button><button data-r="0">Alle</button>
+    </div>
+    <canvas id="chart" height="300"></canvas>
+  </div>
+</section>
+
+<section id="t-st" class="tab">
+  <div class="card"><div class="kpi" id="kpis"></div></div>
+  <div class="card"><b>Monate</b><table id="months"></table></div>
+</section>
+
+<section id="t-se" class="tab">
+  <div class="card">
+    <div class="row">
+      <div><label>Zielgewicht (kg)</label><input id="goal" type="number" inputmode="decimal" step="0.1"></div>
+      <div><label>Größe (cm)</label><input id="height" type="number" inputmode="decimal"></div>
+    </div>
+    <label>Trend-Glättung α (0,05 träge – 0,2 schnell)</label><input id="alpha" type="number" step="0.01" min="0.02" max="0.5">
+    <button class="btn" id="saveSet">Übernehmen</button>
+  </div>
+  <div class="card">
+    <b>Dropbox-Sync</b>
+    <div id="dbxOff">
+      <label>App Key</label><input id="appKey" autocomplete="off">
+      <button class="btn sec" id="dbxAuth">1. Bei Dropbox anmelden</button>
+      <label>2. Angezeigten Code einfügen</label><input id="dbxCode" autocomplete="off">
+      <button class="btn" id="dbxConnect">Verbinden</button>
+    </div>
+    <div id="dbxOn">
+      <p class="hint" id="dbxInfo"></p>
+      <button class="btn" id="dbxSync">Jetzt synchronisieren</button>
+      <button class="btn sec" id="dbxOut">Trennen</button>
+    </div>
+  </div>
+  <div class="card">
+    <b>Backup</b>
+    <button class="btn sec" id="exp">Export CSV</button>
+    <label>Import (CSV: Datum;Gewicht oder JSON)</label><input id="imp" type="file" accept=".csv,.txt,.json">
+  </div>
+</section>
+
+<nav>
+  <button data-t="t-in" class="on">Eingabe</button><button data-t="t-ch">Verlauf</button><button data-t="t-st">Statistik</button><button data-t="t-se">Einstellungen</button>
+</nav>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
